@@ -1,0 +1,10 @@
+# github.com/containernetworking/plugins v0.8.6
+github.com/containernetworking/plugins/pkg/ns
+# github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
+github.com/golang/glog
+# github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
+github.com/songgao/water
+# golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+golang.org/x/sys/windows/registry
