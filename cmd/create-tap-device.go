@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/golang/glog"
 	"github.com/songgao/water"
-	"os"
 )
 
 func createTapDevice(name string, uid uint, gid uint, isMultiqueue bool) error {
@@ -39,13 +41,27 @@ func main() {
 
 	tapName := flag.String("tap-name", "tap0", "override the name of the tap device")
 	launcherPid := flag.String("launcher-pid", "", "optionally specify the PID holding the netns where the tap device will be created.")
+	serveStuff := flag.Bool("consume-tap", false, "Indicate that this process is meant to just sit there and consume the tap device")
 	uid := flag.Int("uid", 0, "the owner UID of the tap device")
 	gid := flag.Int("gid", 0, "the owner GID of the tap device")
 
 	flag.Parse()
 	appMode := "create-tap"
-	glog.V(4).Infof("Started app in %s mode", appMode)
 
+	if *serveStuff {
+		appMode = "consume-tap"
+		glog.V(4).Infof("Started app in %s mode", appMode)
+		err := createTapDevice(*tapName, uint(*uid), uint(*gid), false)
+		if err != nil {
+			glog.Fatalf("Could not open the tapsy-thingy: %+v", err)
+		}
+		glog.V(4).Infof("Opened the tap device on pid %d", os.Getpid())
+		for {
+			time.Sleep(time.Second)
+		}
+	}
+
+	glog.V(4).Infof("Started app in %s mode", appMode)
 	if *launcherPid != "" {
 		glog.V(4).Infof("Executing in netns of pid %s", *launcherPid)
 		netns, err := ns.GetNS(fmt.Sprintf("/proc/%s/ns/net", *launcherPid))
