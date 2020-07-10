@@ -1,21 +1,22 @@
 package main
 
 import (
-	"flag"
+	goflag "flag"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/golang/glog"
 	"github.com/songgao/water"
+	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 )
 
-func setupLogger() {
-	if err := flag.Set("logtostderr", "true"); err != nil {
-		os.Exit(1)
-	}
-}
+var gid uint
+var uid uint
+var tapName string
 
 func createTapDevice(name string, uid uint, gid uint, isMultiqueue bool) error {
 	var err error = nil
@@ -55,43 +56,85 @@ func createTapDeviceOnPIDNetNs(launcherPid string, tapName string, uid uint, gid
 	}
 }
 
+func init() {
+	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+}
+
 func main() {
-	setupLogger()
-
-	tapName := flag.String("tap-name", "tap0", "override the name of the tap device")
-	launcherPid := flag.String("launcher-pid", "", "optionally specify the PID holding the netns where the tap device will be created.")
-	serveStuff := flag.Bool("consume-tap", false, "Indicate that this process is meant to just sit there and consume the tap device")
-	uidInput := flag.Int("uid", 0, "the owner UID of the tap device")
-	gidInput := flag.Int("gid", 0, "the owner GID of the tap device")
-
-	flag.Parse()
-	appMode := "create-tap"
-	uid := uint(*uidInput)
-	gid := uint(*gidInput)
-
-	if *serveStuff {
-		appMode = "consume-tap"
-		glog.V(4).Infof("Started app in %s mode", appMode)
-		err := createTapDevice(*tapName, uid, gid, false)
-		if err != nil {
-			glog.Fatalf("Could not open the tapsy-thingy: %+v", err)
-		}
-
-		glog.V(4).Infof("Opened the tap device on pid %d", os.Getpid())
-		for {
-			time.Sleep(time.Second)
-		}
+	rootCmd := &cobra.Command{
+		Use: "tap-maker",
+		Run: func(cmd *cobra.Command, args []string) {
+			goflag.Parse()
+		},
 	}
 
-	glog.V(4).Infof("Started app in %s mode", appMode)
-	if *launcherPid != "" {
-		glog.V(4).Infof("Executing in netns of pid %s", *launcherPid)
-		createTapDeviceOnPIDNetNs(*launcherPid, *tapName, uid , gid)
-	} else {
-		if err := createTapDevice(*tapName, uid, gid, false); err != nil {
-			glog.Fatalf("error creating tap device: %v", err)
-		}
+	rootCmd.PersistentFlags().StringVar(&tapName, "tap-name", "tap0", "the name of the tap device")
+	rootCmd.PersistentFlags().UintVar(&gid, "gid", 0, "the owner GID of the tap device")
+	rootCmd.PersistentFlags().UintVar(&uid, "uid", 0, "the owner UID of the tap device")
+
+	createTapCmd := &cobra.Command{
+		Use:   "create-tap",
+		Short: "create a tap device in a given PID net ns",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			tapName := cmd.Flag("tap-name").Value.String()
+			launcherPID := cmd.Flag("launcher-pid").Value.String()
+			uidStr := cmd.Flag("uid").Value.String()
+			gidStr := cmd.Flag("gid").Value.String()
+
+			uid, err := strconv.ParseUint(uidStr, 10, 32)
+			if err != nil {
+				return err
+			}
+			gid, err := strconv.ParseUint(gidStr, 10, 32)
+			if err != nil {
+				return err
+			}
+
+			glog.V(4).Infof("Executing in netns of pid %s", launcherPID)
+			createTapDeviceOnPIDNetNs(launcherPID, tapName, uint(uid), uint(gid))
+
+			return nil
+		},
 	}
 
-	glog.Flush()
+	createTapCmd.Flags().StringP("launcher-pid", "p", "", "specify the PID holding the netns where the tap device will be created")
+	if err := createTapCmd.MarkFlagRequired("launcher-pid"); err != nil {
+		os.Exit(1)
+	}
+
+	consumeTapCmd := &cobra.Command{
+		Use:   "consume-tap",
+		Short: "consume a tap device in the current net ns",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			tapName := cmd.Flag("tap-name").Value.String()
+			uidStr := cmd.Flag("uid").Value.String()
+			gidStr := cmd.Flag("gid").Value.String()
+
+			uid, err := strconv.ParseUint(uidStr, 10, 32)
+			if err != nil {
+				return err
+			}
+			gid, err := strconv.ParseUint(gidStr, 10, 32)
+			if err != nil {
+				return err
+			}
+
+			glog.V(4).Info("Will consume tap device named: ")
+			err = createTapDevice(tapName, uint(uid), uint(gid), false)
+			if err != nil {
+				glog.Fatalf("Could not open the tapsy-thingy: %v", err)
+			}
+
+			glog.V(4).Infof("Opened the tap device on pid %d", os.Getpid())
+			for {
+				time.Sleep(time.Second)
+			}
+		},
+	}
+
+	rootCmd.AddCommand(createTapCmd, consumeTapCmd)
+	if err := rootCmd.Execute(); err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
