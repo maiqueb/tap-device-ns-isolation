@@ -6,13 +6,28 @@ Experiments about creating &amp; consuming tap devices in different namespaces
 make docker-build
 ```
 
-## Start a privileged container - must share the host pid ns
+## Start a privileged container - must share the host pid ns, and volume mount the clone device
 ```bash
-docker run -ti --rm --privileged --pid=host --name create-tap tap-experiment bash
+docker run -ti --rm --privileged --pid=host --name create-tap -v /dev/net/tun:/dev/net/tun tap-experiment bash
 ```
 
-## Start a regular container
+## Start a regular container - needs to have the clone device volume mounted into it
 ```bash
-docker run -ti --rm --name consume-tap tap-experiment bash
+docker run -ti --rm --name consume-tap -v /dev/net/tun:/dev/net/tun tap-experiment bash
+```
+
+## Figure out the pid of the un-privileged container
+```bash
+docker inspect consume-tap -f '{{ .State.Pid }}'
+```
+
+## Create a tap device on the target process PID (on the privileged container)
+```bash
+/tap-experiments -tap-name tap1000 -v 9 -launcher-pid <launcher-pid>
+```
+
+## Connect to the created tap device (on the un-privileged container)
+```bash
+/tap-experiments -tap-name tap1000 -v 9 -consume-tap true
 ```
 
