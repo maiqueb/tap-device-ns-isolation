@@ -10,7 +10,7 @@ import (
 	"github.com/songgao/water"
 )
 
-func createTapDevice(name string, isMultiqueue bool) error {
+func createTapDevice(name string, uid uint, gid uint, isMultiqueue bool) error {
 	var err error = nil
 	config := water.Config{
 		DeviceType: water.TAP,
@@ -18,8 +18,8 @@ func createTapDevice(name string, isMultiqueue bool) error {
 			Name:    name,
 			Persist: true,
 			Permissions: &water.DevicePermissions{
-				Owner: 107,
-				Group: 107,
+				Owner: uid,
+				Group: gid,
 			},
 			MultiQueue: isMultiqueue,
 		},
@@ -40,8 +40,12 @@ func main() {
 
 	tapName := flag.String("tap-name", "tap0", "override the name of the tap device")
 	launcherPid := flag.String("launcher-pid", "", "optionally specify the PID holding the netns where the tap device will be created.")
+	uid := flag.Int("uid", 0, "the owner UID of the tap device")
+	gid := flag.Int("gid", 0, "the owner GID of the tap device")
+
 	flag.Parse()
-	glog.V(4).Info("Started app")
+	appMode := "create-tap"
+	glog.V(4).Infof("Started app in %s mode", appMode)
 
 	if *launcherPid != "" {
 		glog.V(4).Infof("Executing in netns of pid %s", *launcherPid)
@@ -53,7 +57,7 @@ func main() {
 			glog.V(4).Info("Successfully loaded netns ...")
 
 			err = netns.Do(func(_ ns.NetNS) error {
-				if err := createTapDevice(*tapName, false); err != nil {
+				if err := createTapDevice(*tapName, uint(*uid), uint(*gid), false); err != nil {
 					glog.Fatalf("error creating tap device: %v", err)
 				}
 
@@ -62,7 +66,7 @@ func main() {
 			})
 		}
 	} else {
-		if err := createTapDevice(*tapName, false); err != nil {
+		if err := createTapDevice(*tapName, uint(*uid), uint(*gid), false); err != nil {
 			glog.Fatalf("error creating tap device: %v", err)
 		}
 	}
