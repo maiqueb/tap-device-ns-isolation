@@ -18,16 +18,16 @@ docker run -ti --rm --name consume-tap -v /dev/net/tun:/dev/net/tun tap-experime
 
 ## Figure out the pid of the un-privileged container
 ```bash
-docker inspect consume-tap -f '{{ .State.Pid }}'
+launcher_pid=$(docker inspect consume-tap -f '{{ .State.Pid }}')
 ```
 
 ## Create a tap device on the target process PID (on the privileged container)
 ```bash
-/tap-experiments -tap-name tap1000 -v 9 -launcher-pid <launcher-pid>
+/tap-maker create-tap --tap-name tap25 --launcher-pid <launcher_pid>
 ```
 
 ## Connect to the created tap device (on the un-privileged container)
 ```bash
-/tap-experiments -tap-name tap1000 -v 9 -consume-tap true
+/tap-maker consume-tap --tap-name tap25
 ```
 
