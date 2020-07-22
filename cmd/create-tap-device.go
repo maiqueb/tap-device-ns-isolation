@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/containernetworking/plugins/pkg/ns"
@@ -12,6 +13,8 @@ import (
 	"github.com/songgao/water"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
+
+	"golang.org/x/sys/unix"
 )
 
 var gid uint
@@ -61,11 +64,13 @@ func init() {
 }
 
 func main() {
+	goflag.Parse()
+	if err := flag.Set("alsologtostderr", "true"); err != nil {
+		os.Exit(32)
+	}
+
 	rootCmd := &cobra.Command{
 		Use: "tap-maker",
-		Run: func(cmd *cobra.Command, args []string) {
-			goflag.Parse()
-		},
 	}
 
 	rootCmd.PersistentFlags().StringVar(&tapName, "tap-name", "tap0", "the name of the tap device")
@@ -119,7 +124,7 @@ func main() {
 				return err
 			}
 
-			glog.V(4).Info("Will consume tap device named: ")
+			glog.V(4).Infof("Will consume tap device named: %s", tapName)
 			err = createTapDevice(tapName, uint(uid), uint(gid), false)
 			if err != nil {
 				glog.Fatalf("Could not open the tapsy-thingy: %v", err)
@@ -132,7 +137,44 @@ func main() {
 		},
 	}
 
-	rootCmd.AddCommand(createTapCmd, consumeTapCmd)
+	execCmd := &cobra.Command{
+		Use:   "exec",
+		Short: "execute a sandboxed command in a specific mount namespace",
+		Args:  cobra.MinimumNArgs(1),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			mntNamespace := cmd.Flag("mount").Value.String()
+			if mntNamespace != "" {
+				// join the mount namespace of a process
+				fd, err := os.Open(mntNamespace)
+				if err != nil {
+					return fmt.Errorf("failed to open mount namespace: %v", err)
+				}
+				defer fd.Close()
+
+				if err = unix.Unshare(unix.CLONE_NEWNS); err != nil {
+					return fmt.Errorf("failed to detach from parent mount namespace: %v", err)
+				}
+				if err := unix.Setns(int(fd.Fd()), unix.CLONE_NEWNS); err != nil {
+					return fmt.Errorf("failed to join the mount namespace: %v", err)
+				}
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			err := syscall.Exec(args[0], args, os.Environ())
+			if err != nil {
+				return fmt.Errorf("failed to execute command: %v", err)
+			}
+			return nil
+		},
+	}
+
+	execCmd.Flags().StringP("mount", "m", "", "specify the mount namespace")
+	if err := execCmd.MarkFlagRequired("mount"); err != nil {
+		os.Exit(1)
+	}
+
+	rootCmd.AddCommand(createTapCmd, consumeTapCmd, execCmd)
 	if err := rootCmd.Execute(); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
