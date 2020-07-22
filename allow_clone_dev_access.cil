@@ -1,0 +1,2 @@
+(allow container_t self (tun_socket (relabelfrom relabelto attach_queue)))
+(allow container_t tun_tap_device_t (chr_file (open read write ioctl)))
