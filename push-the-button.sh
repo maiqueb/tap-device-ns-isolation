@@ -42,3 +42,15 @@ run_in_node node01 "
       /tap-maker exec --mount /proc/1/ns/mnt -- \
         /usr/sbin/semodule -i /root/selinux-policies/allow_clone_dev_access.cil
 "
+
+consumer_pid=$(
+    run_in_node node01 "
+        sudo docker inspect consume-tap \
+          -f '{{ .State.Pid }}'
+    " | tail -n1 | tr -d '\r'
+)
+
+run_in_node node01 "
+    sudo docker exec create-tap \
+      /tap-maker create-tap --tap-name tap0 -p $consumer_pid
+"
