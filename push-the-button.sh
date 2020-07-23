@@ -23,7 +23,7 @@ run_in_node "$node_name" "sudo docker pull registry:5000/tap-experiment"
 run_in_node "$node_name" "
     sudo docker run -ti -d --privileged --pid=host --name create-tap \
       -v /dev/net/tun:/dev/net/tun \
-      -v /root/selinux-policies:/selinux-policies/ \
+      -v /root/selinux-policies:/selinux-policies/:z \
       registry:5000/tap-experiment:latest \
       bash
 "
@@ -55,6 +55,13 @@ consumer_pid=$(
 )
 
 run_in_node "$node_name" "
+    sudo docker cp create-tap:/tap-maker /home/vagrant/tap-maker && \
+      sudo chcon -t container_file_t /home/vagrant/tap-maker
+"
+
+run_in_node "$node_name" "
     sudo docker exec create-tap \
-      /tap-maker create-tap --tap-name $tap_name -p $consumer_pid -v 9
+      /tap-maker exec --mount /proc/1/ns/mnt -- \
+        /home/vagrant/tap-maker create-tap --tap-name $tap_name \
+          -p $consumer_pid -v 9
 "

@@ -4,13 +4,20 @@ github.com/containernetworking/plugins/pkg/ns
 github.com/golang/glog
 # github.com/inconshreveable/mousetrap v1.0.0
 github.com/inconshreveable/mousetrap
+# github.com/opencontainers/selinux v1.6.0
+github.com/opencontainers/selinux/go-selinux
+github.com/opencontainers/selinux/pkg/pwalk
+# github.com/pkg/errors v0.9.1
+github.com/pkg/errors
 # github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 github.com/songgao/water
 # github.com/spf13/cobra v1.0.0
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.3
 github.com/spf13/pflag
-# golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
+# github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243
+github.com/willf/bitset
+# golang.org/x/sys v0.0.0-20191115151921-52ab43148777
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
