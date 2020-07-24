@@ -56,5 +56,5 @@ consumer_pid=$(
 
 run_in_node "$node_name" "
     sudo docker exec create-tap \
-      /tap-maker create-tap --tap-name $tap_name -p $consumer_pid
+      /tap-maker create-tap --tap-name $tap_name -p $consumer_pid -v 9
 "
