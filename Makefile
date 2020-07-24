@@ -59,7 +59,7 @@ vet: $(go_sources)
 docker-build:
 	docker build -t ${IMAGE_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -f ./cmd/Dockerfile .
 
-docker-push:
+docker-push: docker-build
 	docker push ${IMAGE_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
 
 vendor:
