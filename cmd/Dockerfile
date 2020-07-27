@@ -6,8 +6,7 @@ RUN GOOS=linux CGO_ENABLED=e go build -o /tap-experiments -tags=selinux github.c
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 COPY --from=builder /tap-experiments /tap-maker
-RUN microdnf install -y iproute
-
+RUN microdnf install -y iproute procps-ng
 
 ADD allow_clone_dev_access.cil /allow_clone_dev_access.cil
 RUN mkdir -p /selinux-policies && \
