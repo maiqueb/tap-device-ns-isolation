@@ -94,7 +94,7 @@ func init() {
 
 func main() {
 	goflag.Parse()
-	if err := flag.Set("alsologtostderr", "true"); err != nil {
+	if err := flag.Set("logtostderr", "true"); err != nil {
 		os.Exit(32)
 	}
 
