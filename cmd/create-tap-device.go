@@ -4,12 +4,14 @@ import (
 	goflag "flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/golang/glog"
+	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/songgao/water"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -20,6 +22,21 @@ import (
 var gid uint
 var uid uint
 var tapName string
+
+func createTap(name string, isMultiqueue bool) error {
+	tapDeviceArgs := []string{"tuntap", "add", "mode", "tap", "name", name}
+	if isMultiqueue {
+		tapDeviceArgs = append(tapDeviceArgs, "multi_queue")
+	}
+	cmd := exec.Command("ip", tapDeviceArgs...)
+	err := cmd.Run()
+	if err != nil {
+		glog.Fatalf("Failed to create tap device %s. Reason: %v", name, err)
+		return err
+	}
+	glog.Infof("Created tap device: %s", name)
+	return nil
+}
 
 func createTapDevice(name string, uid uint, gid uint, isMultiqueue bool) error {
 	var err error = nil
@@ -49,7 +66,19 @@ func createTapDeviceOnPIDNetNs(launcherPid string, tapName string, uid uint, gid
 		glog.V(4).Info("Successfully loaded netns ...")
 
 		err = netns.Do(func(_ ns.NetNS) error {
-			if err := createTapDevice(tapName, uid, gid, false); err != nil {
+			desiredLabel := "system_u:system_r:container_t:s0"
+			if err := selinux.SetExecLabel(desiredLabel); err != nil {
+				glog.Errorf("Failed to set label: %s. Reason: %v", desiredLabel, err)
+				return err
+			}
+			glog.V(4).Infof("Successfully set selinux label: %s", desiredLabel)
+
+			label, err := selinux.ExecLabel()
+			if err != nil {
+				glog.Errorf("Failed to read label. Reason: %v", err)
+			}
+			glog.V(4).Infof("Read back the context: %s", label)
+			if err := createTap(tapName, false); err != nil {
 				glog.Fatalf("error creating tap device: %v", err)
 			}
 
@@ -65,7 +94,7 @@ func init() {
 
 func main() {
 	goflag.Parse()
-	if err := flag.Set("alsologtostderr", "true"); err != nil {
+	if err := flag.Set("logtostderr", "true"); err != nil {
 		os.Exit(32)
 	}
 
@@ -165,6 +194,7 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("failed to execute command: %v", err)
 			}
+
 			return nil
 		},
 	}
